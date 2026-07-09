@@ -91,12 +91,13 @@ def score_record(rec):
     return score
 
 
-def format_vancouver(rec, num):
-    """AMA/Vancouver numbered style, standard for the target journals (Anesthesiology,
-    BJA, Anesthesia & Analgesia, JCA, Annals of Surgery)."""
+def format_annals_of_surgery(rec, num):
+    """Annals of Surgery (LWW) numbered reference style: first 3 authors then
+    'et al' (not AMA's 6-author cutoff), no periods between author initials,
+    journal abbreviation, Year;Volume(Issue):Pages."""
     authors = rec["all_authors"].split("; ") if rec["all_authors"] else [rec["first_author"]]
-    if len(authors) > 6:
-        author_str = ", ".join(authors[:6]) + ", et al"
+    if len(authors) > 3:
+        author_str = ", ".join(authors[:3]) + ", et al"
     else:
         author_str = ", ".join(authors)
     cite = f"{num}. {author_str}. {rec['title']}. {rec['journal_abbrev'] or rec['journal']}. {rec['year']}"
@@ -106,9 +107,7 @@ def format_vancouver(rec, num):
             cite += f"({rec['issue']})"
     if rec["pages"]:
         cite += f":{rec['pages']}"
-    cite += f". PMID: {rec['pmid']}"
-    if rec["doi"]:
-        cite += f". doi:{rec['doi']}"
+    cite += "."
     return cite
 
 
@@ -136,11 +135,11 @@ def main():
     top25.to_csv(PROJECT_DIR / "outputs" / "tables" / "references_top25.csv", index=False)
     print(f"\nTop 25 saved -> outputs/tables/references_top25.csv")
 
-    formatted = [format_vancouver(r, i + 1) for i, (_, r) in enumerate(top25.iterrows())]
+    formatted = [format_annals_of_surgery(r, i + 1) for i, (_, r) in enumerate(top25.iterrows())]
     refs_path = PROJECT_DIR / "references_formatted.md"
-    refs_path.write_text("# References (top 25 by relevance, from pubmed-Hypothermi-set.nbib)\n\n"
+    refs_path.write_text("# References (Annals of Surgery style, top 25 by relevance, from pubmed-Hypothermi-set.nbib)\n\n"
                           + "\n\n".join(formatted), encoding="utf-8")
-    print(f"Formatted (Vancouver/AMA style) reference list -> {refs_path}")
+    print(f"Formatted (Annals of Surgery style) reference list -> {refs_path}")
 
 
 if __name__ == "__main__":
