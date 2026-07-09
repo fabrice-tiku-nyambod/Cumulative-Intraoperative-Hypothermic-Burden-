@@ -36,10 +36,14 @@ NOMINAL_COLOR = "#c98a2c"        # nominally significant (raw p<0.05) but fails 
 NULL_COLOR = "#9a9a9a"           # non-significant findings -- muted/gray
 RUG_COLOR = "#888888"
 CI_EDGE_COLOR = "#e8a33d"        # warm accent, separates "uncertainty" from "estimate"
+EXPLORATORY_COLOR = "#6a4c93"    # distinct from SIG/NOMINAL/NULL -- exploratory outcomes were never
+                                  # put through multiplicity correction at all, unlike LOS (which was
+                                  # corrected and failed), so reusing NOMINAL_COLOR would misleadingly
+                                  # imply the same "tested and failed" story
 
 
 def figure1_strobe(df_attrition):
-    fig, ax = plt.subplots(figsize=(8.5, 11), dpi=150)
+    fig, ax = plt.subplots(figsize=(8.5, 11), dpi=600)
     ax.set_xlim(0, 10)
     ax.set_ylim(0, 22)
     ax.axis("off")
@@ -111,7 +115,7 @@ def figure2_coefficient_plot(df):
     sds = {"hypothermia_burden": sd_burden, "min_core_temp": sd_temp}
     labels = {"hypothermia_burden": "Hypothermia burden\n(per SD)", "min_core_temp": "Minimum core temp\n(per SD)"}
 
-    fig, axes = plt.subplots(1, 2, figsize=(9, 3.5), dpi=150)
+    fig, axes = plt.subplots(1, 2, figsize=(9, 3.5), dpi=600)
 
     # Color encodes which variable (burden vs. min-temp); saturation/fill encodes
     # significance -- the one real finding (transfusion x burden) reads as "hot"
@@ -167,6 +171,52 @@ def figure2_coefficient_plot(df):
     fig.savefig(FIGURES_DIR / "figure2_coefficient_plot.png", facecolor="white", bbox_inches="tight")
     plt.close(fig)
     print(f"Figure 2 (coefficient plot) saved -> {FIGURES_DIR / 'figure2_coefficient_plot.png'}")
+
+
+def figure5_coagulation_paradox(df):
+    """The coagulation paradox (aPTT, fibrinogen -- both significant but in the
+    counterintuitive direction, Aim 2, exploratory/uncorrected) given its own
+    visual support rather than being left as prose + a table cell. Same style
+    as Figure 2, but a distinct color (not SIG/NOMINAL/NULL from Figure 4) --
+    these were never put through multiplicity correction at all, so coloring
+    them like LOS ("tested and failed correction") would misstate what
+    actually happened here."""
+    f_aptt = f"delta_aptt ~ hypothermia_burden + min_core_temp + {COV_STR}"
+    f_fib = f"delta_fib ~ hypothermia_burden + min_core_temp + {COV_STR}"
+    sub_aptt = df.dropna(subset=["delta_aptt"])
+    sub_fib = df.dropna(subset=["delta_fib"])
+    m_aptt = smf.ols(f_aptt, data=sub_aptt).fit()
+    m_fib = smf.ols(f_fib, data=sub_fib).fit()
+
+    sd = df["hypothermia_burden"].std()
+
+    fig, axes = plt.subplots(1, 2, figsize=(8, 3), dpi=600)
+
+    for ax, m, label, unit in [(axes[0], m_aptt, "aPTT", "sec"), (axes[1], m_fib, "Fibrinogen", "mg/dL")]:
+        b = m.params["hypothermia_burden"] * sd
+        ci = m.conf_int().loc["hypothermia_burden"] * sd
+        p = m.pvalues["hypothermia_burden"]
+        ax.plot([ci[0], ci[1]], [0, 0], color=EXPLORATORY_COLOR, lw=2.5, solid_capstyle="round", zorder=2)
+        ax.plot(b, 0, "o", color=EXPLORATORY_COLOR, markersize=10,
+                markerfacecolor=EXPLORATORY_COLOR, markeredgecolor=EXPLORATORY_COLOR, zorder=3)
+        ax.axvline(0, color="#666666", lw=1.3, linestyle=(0, (4, 2)), zorder=0)
+        ax.set_yticks([])
+        ax.set_ylim(-1, 1)
+        ax.set_xlabel(f"Delta {label} per SD burden, {unit}", fontsize=9)
+        p_label = "p<0.0001" if p < 0.0001 else f"p={p:.4f}"
+        ax.set_title(f"{label} (N={int(m.nobs)}, {p_label})", fontsize=10)
+        ax.spines[["top", "right", "left"]].set_visible(False)
+        ax.tick_params(colors=TEXT_COLOR)
+        ax.grid(axis="x", color="#e5e5e5", linewidth=0.8, zorder=0)
+        ax.set_axisbelow(True)
+
+    fig.suptitle("Figure 5. The coagulation paradox: burden vs. aPTT/fibrinogen change\n"
+                 "(Aim 2, EXPLORATORY -- uncorrected, not put through multiplicity correction)",
+                 fontsize=10.5, color=TEXT_COLOR)
+    fig.tight_layout()
+    fig.savefig(FIGURES_DIR / "figure5_coagulation_paradox.png", facecolor="white", bbox_inches="tight")
+    plt.close(fig)
+    print(f"Figure 5 (coagulation paradox) saved -> {FIGURES_DIR / 'figure5_coagulation_paradox.png'}")
 
 
 def figure4_multi_outcome(df):
@@ -230,7 +280,7 @@ def figure4_multi_outcome(df):
         "null": dict(color=NULL_COLOR, markersize=7, fill=False),
     }
 
-    fig, ax = plt.subplots(figsize=(7.5, 4.2), dpi=150)
+    fig, ax = plt.subplots(figsize=(7.5, 4.2), dpi=600)
     ys = np.arange(len(rows))[::-1]
     for y, (label, n, b, lo, hi, p) in zip(ys, rows):
         cls = classify(label, p)
@@ -296,6 +346,7 @@ def assemble_manifest():
         ("Table 9", "table9_v1_replication_comparison.csv", "v1 (Delta Hb) vs. v2 (EBL) direct comparison, identical covariates/cohort/model type -- burden not significant for either outcome"),
         ("Figure 3 values", "figure3_rcs_values.csv", "RCS predicted-EBL values, peak-to-trough, CI band width, nonlinearity LRT p -- backs Figure 3's caption numbers"),
         ("Figure 4 values", "figure4_multi_outcome_values.csv", "Per-SD burden coefficient, CI, p for all 5 outcomes -- backs Figure 4's multi-outcome summary plot"),
+        ("Table 2d", "table2d_preop_hb_sensitivity.csv", "Sensitivity analysis: Aim 1 models with preop_hb added -- transfusion association survives (OR/SD 1.330->1.320, still p<0.05), EBL remains null"),
     ]
     rows = []
     for label, fname, desc in manifest:
@@ -324,6 +375,9 @@ def main():
     print()
 
     figure4_multi_outcome(df)
+    print()
+
+    figure5_coagulation_paradox(df)
     print()
 
     print("=" * 70)

@@ -50,12 +50,59 @@ def md_inline_to_reportlab(text):
     return text
 
 
-def load_csv_as_table(path, max_cols=6, font_size=6.5):
-    df = pd.read_csv(path)
+RAW_FLOAT_RE = re.compile(r"^-?\d*\.\d{5,}$")  # a bare float with >=5 decimal digits, no other text
+
+
+def load_csv_as_table(path, max_cols=12, font_size=8.5, max_width=6.3 * inch):
+    # dtype=str preserves already-formatted values exactly as the originating
+    # script wrote them (e.g. "0.0000", "358.3 +/- 1145.3", "10.2%") --
+    # pandas would otherwise silently re-infer numeric-looking string columns
+    # as float64 on read and strip that formatting (0.0000 -> 0.0 -> "0"
+    # once rounded, which reads as an exact zero it isn't).
+    df = pd.read_csv(path, dtype=str)
     if df.shape[1] > max_cols:
+        # Only trips for tables wider than any currently embedded (Table 1: 5
+        # cols, Table 9: 8 cols) -- if this fires, a column is being silently
+        # dropped and needs the same attention Table 9's p-value/R2 columns did.
+        print(f"WARNING: {path.name} has {df.shape[1]} columns, truncating to {max_cols} -- check what's being dropped")
         df = df.iloc[:, :max_cols]
-    data = [list(df.columns)] + df.astype(str).values.tolist()
-    t = Table(data, hAlign="CENTER", repeatRows=1)
+
+    # Wide tables get less room per numeric column -- shrink font and
+    # precision together so values fit on one line instead of wrapping
+    # mid-number ("0.000170" / "7" across two lines, seen on first render).
+    n_cols = df.shape[1]
+    if n_cols > 6:
+        font_size = 7.0
+        sig_figs = 3
+    else:
+        sig_figs = 4
+
+    def fmt_cell(v):
+        # Only reformat genuinely raw, over-long floats (e.g.
+        # "0.00017066696884482412", straight from an unrounded model
+        # coefficient) -- leave already-formatted strings untouched so
+        # "0.0000" stays "0.0000", not silently becomes "0".
+        if isinstance(v, str) and RAW_FLOAT_RE.match(v):
+            f = float(v)
+            return f"{f:.{sig_figs}g}" if abs(f) < 1 else f"{f:.{sig_figs}f}"
+        return "" if pd.isna(v) else str(v)
+
+    # Wrap cell text in Paragraphs so long values wrap within the column instead
+    # of forcing the table wider than the page or truncating silently.
+    cell_style = ParagraphStyle("Cell", parent=styles["Normal"], fontSize=font_size, leading=font_size + 2)
+    header_style = ParagraphStyle("CellHeader", parent=cell_style, fontName="Helvetica-Bold")
+    header_row = [Paragraph(str(c), header_style) for c in df.columns]
+    body_rows = [[Paragraph(fmt_cell(v), cell_style) for v in row] for row in df.values.tolist()]
+    data = [header_row] + body_rows
+    # First column is conventionally the row label (Characteristic/Outcome/etc.)
+    # and tends to hold longer text than the numeric columns that follow --
+    # giving it double weight avoids mid-word wrapping like "Delta Hb (u /
+    # ntransform / ed)" under uniform equal-width columns.
+    n_other = df.shape[1] - 1
+    label_width = max_width * 2 / (n_other + 2)
+    other_width = max_width / (n_other + 2)
+    col_widths = [label_width] + [other_width] * n_other
+    t = Table(data, hAlign="CENTER", repeatRows=1, colWidths=col_widths)
     t.setStyle(TableStyle([
         ("FONTSIZE", (0, 0), (-1, -1), font_size),
         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
@@ -185,6 +232,10 @@ def insert_anchored_content(story):
              "<b>Figure 4.</b> Hypothermia burden across all five tested outcomes: one confirmed "
              "finding (transfusion), one that fails multiplicity correction (LOS), three nulls "
              "(EBL, Delta Hb, AKI).")),
+        ("less-prolonged) rise in aPTT and a larger rise in fibrinogen",
+         lambda: figure_flowable("figure5_coagulation_paradox.png",
+             "<b>Figure 5.</b> The coagulation paradox: burden vs. aPTT and fibrinogen change "
+             "(Aim 2, exploratory, uncorrected for multiplicity).")),
     ]
 
     new_story = []

@@ -150,7 +150,7 @@ def followup_2_rcs_plot(df):
     ebl_lo = np.expm1(pred["mean_ci_lower"])
     ebl_hi = np.expm1(pred["mean_ci_upper"])
 
-    fig, ax = plt.subplots(figsize=(7, 5), dpi=150)
+    fig, ax = plt.subplots(figsize=(7, 5), dpi=600)
     ax.fill_between(grid, ebl_lo, ebl_hi, color=BAND_COLOR, alpha=0.6, linewidth=0, label="95% CI")
     # Warm-accent CI edges, distinct from the blue estimate line, so "uncertainty
     # boundary" and "point estimate" read as two different things at a glance.
