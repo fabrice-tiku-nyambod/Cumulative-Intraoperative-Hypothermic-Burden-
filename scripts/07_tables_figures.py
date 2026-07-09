@@ -150,10 +150,13 @@ def assemble_manifest():
         ("Table 4", "table4_coagulation_exploratory.csv", "Coagulation deltas (Aim 2, EXPLORATORY, uncorrected p-values)"),
         ("Table 5", "table5_aki_los_models.csv", "AKI and LOS models (Aim 3)"),
         ("Table 5b", "table5b_holm_bonferroni.csv", "Holm-Bonferroni correction, AKI+LOS 2-test family only (LOS's raw p=0.042 does NOT survive correction)"),
+        ("Table 5c", "table5c_icu_admission.csv", "ICU admission (any), supplementary binary model; icu_days zero-inflation fraction"),
         ("Table 6", "table6_vif.csv", "VIF collinearity diagnostics, fully adjusted linear model (all <2.3)"),
         ("Table 7", "table7_mortality_descriptive.csv", "Mortality by burden tertile, DESCRIPTIVE ONLY (17 events, not modeled)"),
         ("Table 8", "excluded_vs_included_comparison.csv", "Excluded-vs-included cohort comparison (EBL/transfusion/AKI/coag -- no differential attrition by outcome severity on any dimension checked)"),
+        ("Table 8b", "table8b_stomach_coverage_association.csv", "Stomach-surgery coverage-failure association, unadjusted and adjusted OR/CI/p"),
         ("Table 9", "table9_v1_replication_comparison.csv", "v1 (Delta Hb) vs. v2 (EBL) direct comparison, identical covariates/cohort/model type -- burden not significant for either outcome"),
+        ("Figure 3 values", "figure3_rcs_values.csv", "RCS predicted-EBL values, peak-to-trough, CI band width, nonlinearity LRT p -- backs Figure 3's caption numbers"),
     ]
     rows = []
     for label, fname, desc in manifest:
