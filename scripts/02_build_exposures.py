@@ -43,6 +43,7 @@ BT_ARTIFACT_LOW, BT_ARTIFACT_HIGH = 32.0, 41.0
 HYPOTHERMIA_THRESHOLD = 36.0
 MAP_HYPOTENSION_THRESHOLD = 65.0
 COVERAGE_MIN_TRIMMED = 0.95
+MBP_COVERAGE_MIN_TRIMMED = 0.95  # Aim 4 (a-line subset) inclusion rule, same threshold as BT
 EARLY_WINDOW_MIN = 30
 
 CHECKPOINT_PATH = DATA_DIR / "checkpoint_completed_caseids.txt"
@@ -134,12 +135,24 @@ def extract_case_features(caseid, anestart, aneend):
         else np.nan
     )
 
+    # Aim 4 (a-line subset only): same trimmed-window >=95% rule as BT, applied
+    # to MAP. Cases with zero MAP data (no arterial line) get trimmed coverage
+    # 0.0, which correctly fails the threshold rather than raising.
+    if mbp_ok.sum() > 0:
+        mbp_valid_idx = np.flatnonzero(mbp_ok)
+        mbp_first, mbp_last = mbp_valid_idx[0], mbp_valid_idx[-1]
+        mbp_trimmed_ok = mbp_ok[mbp_first:mbp_last + 1]
+        mbp_coverage_trimmed = mbp_trimmed_ok.sum() / len(mbp_trimmed_ok)
+    else:
+        mbp_coverage_trimmed = 0.0
+
     return {
         "caseid": caseid,
         "status": "ok",
         "bt_coverage_full_window": bt_coverage_full_window,
         "bt_coverage_trimmed": bt_coverage_trimmed,
         "mbp_coverage": mbp_coverage,
+        "mbp_coverage_trimmed": mbp_coverage_trimmed,
         "hypothermia_burden": burden,
         "hypothermia_duration_min": hypothermia_duration_min,
         "min_core_temp": min_core_temp,
@@ -220,6 +233,13 @@ def main():
         print()
         print(f"Final analytic cohort (candidate AND trimmed BT coverage >= {COVERAGE_MIN_TRIMMED:.0%}): N = {len(final)}")
         print(f"-> {DATA_DIR / 'final_exposure_cohort.parquet'}")
+
+        # Aim 4 cohort: analytic cohort AND MAP trimmed coverage >= 95% (a-line subset only).
+        aim4 = final[final["mbp_coverage_trimmed"] >= MBP_COVERAGE_MIN_TRIMMED]
+        aim4.to_parquet(DATA_DIR / "aim4_cohort.parquet", index=False)
+        print(f"Aim 4 cohort (analytic cohort AND trimmed MAP coverage >= {MBP_COVERAGE_MIN_TRIMMED:.0%}, "
+              f"i.e. arterial-line subset): N = {len(aim4)} ({len(aim4)/len(final):.1%} of analytic cohort)")
+        print(f"-> {DATA_DIR / 'aim4_cohort.parquet'}")
 
 
 if __name__ == "__main__":
