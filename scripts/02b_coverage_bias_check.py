@@ -87,9 +87,15 @@ def build_comparison_table(m):
         rows.append([label, f"{inc.mean():.1f} +/- {inc.std():.1f}", f"{exc.mean():.1f} +/- {exc.std():.1f}", f"{p:.4f}"])
 
     def add_cat(label, col, val):
-        inc = (m.loc[m["included"], col] == val).mean()
-        exc = (m.loc[~m["included"], col] == val).mean()
-        tab = pd.crosstab(m["included"], m[col] == val)
+        # col == val on a NaN row silently evaluates to False, not NaN/excluded.
+        # Not currently live here (sex/emop/optype/transfused are all 100%
+        # complete), but hardened defensively -- this exact pattern caused a
+        # real bug once it was reused in 03b for a column with real missingness
+        # (aki_any), and this helper could be reused the same way again.
+        present = m[m[col].notna()]
+        inc = (present.loc[present["included"], col] == val).mean()
+        exc = (present.loc[~present["included"], col] == val).mean()
+        tab = pd.crosstab(present["included"], present[col] == val)
         _, p, _, _ = stats.chi2_contingency(tab)
         rows.append([label, f"{inc:.1%}", f"{exc:.1%}", f"{p:.4f}"])
 
