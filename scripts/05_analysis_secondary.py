@@ -136,8 +136,8 @@ def mortality_descriptive(df):
     tab = d.groupby("burden_tertile", observed=True)["death_inhosp"].agg(["sum", "count"])
     tab["pct"] = (tab["sum"] / tab["count"] * 100).round(2)
     print(tab)
-    tab.to_csv(TABLES_DIR / "table5_mortality_descriptive.csv")
-    print(f"\nSaved -> {TABLES_DIR / 'table5_mortality_descriptive.csv'}")
+    tab.to_csv(TABLES_DIR / "table7_mortality_descriptive.csv")
+    print(f"\nSaved -> {TABLES_DIR / 'table7_mortality_descriptive.csv'}")
     print()
 
 
@@ -153,6 +153,23 @@ def main():
     fit_icu_admission_model(df)
     fit_coagulation_models(df)
     mortality_descriptive(df)
+
+    print("=" * 70)
+    print("TABLE 5: AKI and LOS models (burden term)")
+    print("=" * 70)
+    term = "hypothermia_burden"
+    b_aki, ci_aki = m_aki.params[term], m_aki.conf_int().loc[term]
+    b_los, ci_los = m_los.params[term], m_los.conf_int().loc[term]
+    t5 = pd.DataFrame([
+        ["AKI (logistic, KDIGO corrected)", int(m_aki.nobs), f"OR={np.exp(b_aki):.4f}",
+         f"[{np.exp(ci_aki[0]):.4f}, {np.exp(ci_aki[1]):.4f}]", f"{p_aki:.4f}"],
+        ["LOS (log-linear, dis-opend)", int(m_los.nobs), f"beta={b_los:.6f}",
+         f"[{ci_los[0]:.6f}, {ci_los[1]:.6f}]", f"{p_los:.4f}"],
+    ], columns=["Outcome", "N", "Estimate (burden)", "95% CI", "p-value"])
+    print(t5.to_string(index=False))
+    t5.to_csv(TABLES_DIR / "table5_aki_los_models.csv", index=False)
+    print(f"\nSaved -> {TABLES_DIR / 'table5_aki_los_models.csv'}")
+    print()
 
     print("=" * 70)
     print("Holm-Bonferroni correction: AKI + LOS only (2-test family)")

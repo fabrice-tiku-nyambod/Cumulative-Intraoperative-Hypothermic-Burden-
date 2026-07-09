@@ -250,11 +250,15 @@ def main():
     for label, m, is_logit in [("Linear (log EBL)", m_linear, False), ("Logistic (transfusion)", m_logit, True)]:
         for term in ["hypothermia_burden", "min_core_temp"]:
             coef, p = m.params[term], m.pvalues[term]
+            ci = m.conf_int().loc[term]
             if is_logit:
-                key_rows.append([label, term, f"OR={np.exp(coef):.4f}", f"{p:.4f}"])
+                key_rows.append([label, term, np.exp(coef), np.exp(ci[0]), np.exp(ci[1]), p,
+                                  f"OR={np.exp(coef):.4f}", f"{p:.4f}"])
             else:
-                key_rows.append([label, term, f"beta={coef:.5f}", f"{p:.4f}"])
-    pd.DataFrame(key_rows, columns=["Model", "Term", "Estimate", "p-value"]).to_csv(
+                key_rows.append([label, term, coef, ci[0], ci[1], p,
+                                  f"beta={coef:.5f}", f"{p:.4f}"])
+    pd.DataFrame(key_rows, columns=["Model", "Term", "Estimate_raw", "CI_low", "CI_high", "p_raw",
+                                     "Estimate", "p-value"]).to_csv(
         TABLES_DIR / "table2_primary_models_key_terms.csv", index=False)
     print()
 
