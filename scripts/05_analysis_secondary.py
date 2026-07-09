@@ -92,9 +92,10 @@ def fit_los_model(df):
 def fit_icu_admission_model(df):
     print("=" * 70)
     print("ICU admission (any, icu_days>0): logistic regression [supplementary]")
-    print("(icu_days is 70.5% zero -- modeled as binary admission, not a count/")
-    print(" duration model, given the zero-inflation)")
     print("=" * 70)
+    zero_frac = (df["icu_days"] == 0).mean()
+    print(f"icu_days==0 in {int((df['icu_days']==0).sum())}/{len(df)} cases ({zero_frac:.1%}) -- "
+          f"modeled as binary admission, not a count/duration model, given the zero-inflation")
     sub = df.copy()
     sub["icu_admit"] = (sub["icu_days"] > 0).astype(int)
     f = f"icu_admit ~ hypothermia_burden + min_core_temp + {COV_STR_LOGIT}"
@@ -103,6 +104,19 @@ def fit_icu_admission_model(df):
     b, p = m.params["hypothermia_burden"], m.pvalues["hypothermia_burden"]
     ci = np.exp(m.conf_int().loc["hypothermia_burden"])
     print(f"burden: OR={np.exp(b):.4f} (95% CI {ci[0]:.4f}-{ci[1]:.4f}), p={p:.4f}")
+    print()
+
+    icu_tbl = pd.DataFrame([{
+        "icu_days_zero_n": int((df["icu_days"] == 0).sum()),
+        "icu_days_zero_pct": round(zero_frac * 100, 1),
+        "model_N": int(m.nobs),
+        "burden_OR": round(np.exp(b), 4),
+        "burden_CI_low": round(ci[0], 4),
+        "burden_CI_high": round(ci[1], 4),
+        "burden_p": round(p, 4),
+    }])
+    icu_tbl.to_csv(TABLES_DIR / "table5c_icu_admission.csv", index=False)
+    print(f"Saved -> {TABLES_DIR / 'table5c_icu_admission.csv'}")
     print()
     return m
 
