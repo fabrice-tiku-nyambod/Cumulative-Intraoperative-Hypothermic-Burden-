@@ -26,8 +26,16 @@ COV_STR = " + ".join(COVARIATES)
 
 TEXT_COLOR = "#2a2a2a"
 BOX_EDGE = "#555555"
-EXCL_COLOR = "#c0392b"
-LINE_COLOR = "#1f5fa8"
+MILESTONE_FILL = "#eef3fa"
+DATAQUAL_COLOR = "#5b7c99"      # coverage/data-quality exclusions (most steps)
+CONSTRUCT_COLOR = "#8e44ad"      # construct-validity exclusion (ASA=6) -- categorically different reason
+LINE_COLOR = "#1f5fa8"           # hypothermia burden
+TEMP_COLOR = "#2a9d8f"           # minimum core temperature (distinct hue from burden)
+SIG_COLOR = "#c0392b"            # confirmed significant finding -- "hot"
+NOMINAL_COLOR = "#c98a2c"        # nominally significant (raw p<0.05) but fails multiplicity correction
+NULL_COLOR = "#9a9a9a"           # non-significant findings -- muted/gray
+RUG_COLOR = "#888888"
+CI_EDGE_COLOR = "#e8a33d"        # warm accent, separates "uncertainty" from "estimate"
 
 
 def figure1_strobe(df_attrition):
@@ -36,24 +44,28 @@ def figure1_strobe(df_attrition):
     ax.set_ylim(0, 22)
     ax.axis("off")
 
+    # excl_kind: "data" (coverage/data-quality) vs "construct" (construct-validity,
+    # categorically different reason -- ASA=6 isn't a data problem, it's a population-
+    # definition problem) -- colored distinctly so a reader isn't reading every
+    # exclusion arrow as "the same kind of reason."
     steps = [
-        ("Total cases in clinical_data.csv\n(VitalDB v1.0.0)", 6388, None),
-        ("Department in {General, Thoracic,\nUrology, Gynecology} surgery", 6388, "0 excluded (all cases already\nin these 4 departments)"),
-        ("Age >= 18 years", 6323, "65 excluded\n(8 unparseable/missing age)"),
-        ("Operative duration\n(opend-opstart) > 120 min", 2865, "3,458 excluded"),
-        ("Reoperation dedup\n(index case per subjectid)", 2824, "41 excluded\n(39 subjects had >1 case)"),
-        ("CANDIDATE COHORT", 2824, None),
-        ("BT trimmed coverage >= 95%\n(per-case observed-window rule)", 2568, "256 excluded:\n75 no_valid_bt, 1 empty-window,\n180 failed coverage threshold"),
-        ("ANALYTIC COHORT", 2568, None),
-        ("Exclude ASA=6\n(brain-dead organ donor)", 2567, "1 excluded (physiologically\nnon-comparable to surgical cohort)"),
-        ("FINAL AIM 1-3 COHORT", 2567, None),
+        ("Total cases in clinical_data.csv\n(VitalDB v1.0.0)", 6388, None, None),
+        ("Department in {General, Thoracic,\nUrology, Gynecology} surgery", 6388, "0 excluded (all cases already\nin these 4 departments)", "data"),
+        ("Age >= 18 years", 6323, "65 excluded\n(8 unparseable/missing age)", "data"),
+        ("Operative duration\n(opend-opstart) > 120 min", 2865, "3,458 excluded", "data"),
+        ("Reoperation dedup\n(index case per subjectid)", 2824, "41 excluded\n(39 subjects had >1 case)", "data"),
+        ("CANDIDATE COHORT", 2824, None, None),
+        ("BT trimmed coverage >= 95%\n(per-case observed-window rule)", 2568, "256 excluded:\n75 no_valid_bt, 1 empty-window,\n180 failed coverage threshold", "data"),
+        ("ANALYTIC COHORT", 2568, None, None),
+        ("Exclude ASA=6\n(brain-dead organ donor)", 2567, "1 excluded (physiologically\nnon-comparable to surgical cohort)", "construct"),
+        ("FINAL AIM 1-3 COHORT", 2567, None, None),
     ]
 
     y = 21
     box_h = 1.15
-    for i, (label, n, excl_note) in enumerate(steps):
+    for i, (label, n, excl_note, excl_kind) in enumerate(steps):
         is_milestone = label.isupper() or label in ("CANDIDATE COHORT", "ANALYTIC COHORT", "FINAL AIM 1-3 COHORT")
-        fc = "#eef3fa" if is_milestone else "white"
+        fc = MILESTONE_FILL if is_milestone else "white"
         lw = 2.0 if is_milestone else 1.2
         box = plt.Rectangle((1.5, y - box_h), 6, box_h, facecolor=fc, edgecolor=BOX_EDGE, linewidth=lw, zorder=2)
         ax.add_patch(box)
@@ -62,14 +74,20 @@ def figure1_strobe(df_attrition):
                  fontweight="bold" if is_milestone else "normal", color=TEXT_COLOR, zorder=3)
 
         if excl_note:
+            excl_color = CONSTRUCT_COLOR if excl_kind == "construct" else DATAQUAL_COLOR
             ax.annotate("", xy=(7.6, y - box_h / 2), xytext=(9.3, y - box_h / 2),
-                         arrowprops=dict(arrowstyle="-", color=EXCL_COLOR, lw=1.2), zorder=1)
-            ax.text(9.35, y - box_h / 2, excl_note, ha="left", va="center", fontsize=7.3, color=EXCL_COLOR)
+                         arrowprops=dict(arrowstyle="-", color=excl_color, lw=1.2), zorder=1)
+            ax.text(9.35, y - box_h / 2, excl_note, ha="left", va="center", fontsize=7.3, color=excl_color)
 
         if i < len(steps) - 1:
             ax.annotate("", xy=(4.5, y - box_h - 0.55), xytext=(4.5, y - box_h),
                          arrowprops=dict(arrowstyle="-|>", color=BOX_EDGE, lw=1.4), zorder=1)
         y -= box_h + 0.75
+
+    # Legend distinguishing the two exclusion categories.
+    ax.plot([], [], color=DATAQUAL_COLOR, lw=1.5, label="Coverage / data-quality exclusion")
+    ax.plot([], [], color=CONSTRUCT_COLOR, lw=1.5, label="Construct-validity exclusion")
+    ax.legend(loc="lower center", bbox_to_anchor=(0.5, -0.02), fontsize=8, frameon=False, ncol=2)
 
     ax.set_title("Figure 1. STROBE cohort flow diagram", fontsize=12, color=TEXT_COLOR, pad=10)
     fig.tight_layout()
@@ -95,28 +113,39 @@ def figure2_coefficient_plot(df):
 
     fig, axes = plt.subplots(1, 2, figsize=(9, 3.5), dpi=150)
 
+    # Color encodes which variable (burden vs. min-temp); saturation/fill encodes
+    # significance -- the one real finding (transfusion x burden) reads as "hot"
+    # against everything else, which is muted gray regardless of variable.
+    var_color = {"hypothermia_burden": LINE_COLOR, "min_core_temp": TEMP_COLOR}
+
     ax = axes[0]
     terms = ["hypothermia_burden", "min_core_temp"]
     ys = np.arange(len(terms))[::-1]
     for y, term in zip(ys, terms):
         b = m_lin.params[term] * sds[term]
         ci = m_lin.conf_int().loc[term] * sds[term]
-        ax.plot([ci[0], ci[1]], [y, y], color=LINE_COLOR, lw=2, solid_capstyle="round")
-        ax.plot(b, y, "o", color=LINE_COLOR, markersize=7, zorder=3)
-    ax.axvline(0, color="#999999", lw=1, linestyle="--", zorder=0)
+        sig = m_lin.pvalues[term] < 0.05
+        c = var_color[term] if sig else NULL_COLOR
+        ax.plot([ci[0], ci[1]], [y, y], color=c, lw=2, solid_capstyle="round")
+        ax.plot(b, y, "o", color=c, markersize=8 if sig else 6,
+                markerfacecolor=c if sig else "white", markeredgecolor=c, markeredgewidth=1.5, zorder=3)
+    ax.axvline(0, color="#666666", lw=1.3, linestyle=(0, (4, 2)), zorder=0)
     ax.set_yticks(ys)
     ax.set_yticklabels([labels[t] for t in terms], fontsize=9)
     ax.set_xlabel("Beta, log(EBL+1) per SD", fontsize=9)
-    ax.set_title("A. Blood loss (linear, N={})".format(int(m_lin.nobs)), fontsize=10)
+    ax.set_title("A. Blood loss (linear, N={}) -- null for both".format(int(m_lin.nobs)), fontsize=10)
     ax.spines[["top", "right"]].set_visible(False)
 
     ax = axes[1]
     for y, term in zip(ys, terms):
         or_val = np.exp(m_log.params[term] * sds[term])
         ci = np.exp(m_log.conf_int().loc[term] * sds[term])
-        ax.plot([ci[0], ci[1]], [y, y], color=LINE_COLOR, lw=2, solid_capstyle="round")
-        ax.plot(or_val, y, "o", color=LINE_COLOR, markersize=7, zorder=3)
-    ax.axvline(1, color="#999999", lw=1, linestyle="--", zorder=0)
+        sig = m_log.pvalues[term] < 0.05
+        c = var_color[term] if sig else NULL_COLOR
+        ax.plot([ci[0], ci[1]], [y, y], color=c, lw=2, solid_capstyle="round")
+        ax.plot(or_val, y, "o", color=c, markersize=8 if sig else 6,
+                markerfacecolor=c if sig else "white", markeredgecolor=c, markeredgewidth=1.5, zorder=3)
+    ax.axvline(1, color="#666666", lw=1.3, linestyle=(0, (4, 2)), zorder=0)
     ax.set_xscale("log")
     xticks = [0.8, 0.9, 1.0, 1.2, 1.4, 1.6]
     ax.set_xticks(xticks)
@@ -125,7 +154,7 @@ def figure2_coefficient_plot(df):
     ax.set_yticks(ys)
     ax.set_yticklabels([labels[t] for t in terms], fontsize=9)
     ax.set_xlabel("Odds ratio, transfusion per SD", fontsize=9)
-    ax.set_title("B. Transfusion (logistic, N={})".format(int(m_log.nobs)), fontsize=10)
+    ax.set_title("B. Transfusion (logistic, N={}) -- burden significant".format(int(m_log.nobs)), fontsize=10)
     ax.spines[["top", "right"]].set_visible(False)
 
     for a in axes:
@@ -138,6 +167,115 @@ def figure2_coefficient_plot(df):
     fig.savefig(FIGURES_DIR / "figure2_coefficient_plot.png", facecolor="white", bbox_inches="tight")
     plt.close(fig)
     print(f"Figure 2 (coefficient plot) saved -> {FIGURES_DIR / 'figure2_coefficient_plot.png'}")
+
+
+def figure4_multi_outcome(df):
+    """The paper's argument in one image: burden's per-SD effect across all five
+    outcomes, on each outcome's own natural modeled scale (log-OR for binary,
+    beta for continuous -- not a manufactured common unit, since these outcomes
+    have no shared natural scale, but each is a real fitted coefficient with a
+    real CI). New figure -- fills the slot Aim 4 vacated when it was deferred.
+
+    Significance coloring reflects the PAPER'S ACTUAL conclusions, not a flat
+    p<0.05 cutoff: transfusion (p=0.001, Aim 1 primary, no correction issue) is
+    the one true finding -> filled red. LOS (raw p=0.042) does NOT survive the
+    Holm-Bonferroni correction already applied against AKI in Table 5b (fails
+    at the 0.025 threshold) -- coloring it the same red as transfusion would
+    visually contradict that table. LOS gets its own amber/half-open marker:
+    "nominally significant uncorrected, does not survive correction" is a
+    real third category here, not null and not confirmed."""
+    sd = df["hypothermia_burden"].std()
+    cov_logit = COV_STR.replace("C(optype)", "C(optype_collapsed)")
+
+    specs = [
+        ("Transfusion\n(log-OR/SD)", "transfused", cov_logit, "logit", None),
+        ("EBL\n(log-beta/SD)", "log_ebl", COV_STR, "ols", None),
+        ("Delta Hb\n(beta/SD, g/dL)", "delta_hb", COV_STR, "ols", None),
+        ("AKI\n(log-OR/SD)", "aki_any", cov_logit, "logit", None),
+        ("LOS\n(log-beta/SD)", None, COV_STR, "ols_los", None),
+    ]
+
+    rows = []
+    for label, outcome, cov, kind, _ in specs:
+        if kind == "ols_los":
+            sub = df[df["los_postop_days"] > 0].copy()
+            sub["log_los"] = np.log(sub["los_postop_days"])
+            f = f"log_los ~ hypothermia_burden + min_core_temp + {cov}"
+            m = smf.ols(f, data=sub).fit()
+        elif kind == "logit":
+            sub = df.dropna(subset=[outcome]) if outcome == "aki_any" else df
+            f = f"{outcome} ~ hypothermia_burden + min_core_temp + {cov}"
+            m = smf.logit(f, data=sub).fit(disp=0)
+        else:
+            f = f"{outcome} ~ hypothermia_burden + min_core_temp + {cov}"
+            m = smf.ols(f, data=df).fit()
+        b = m.params["hypothermia_burden"] * sd
+        ci = m.conf_int().loc["hypothermia_burden"] * sd
+        p = m.pvalues["hypothermia_burden"]
+        rows.append([label, int(m.nobs), b, ci[0], ci[1], p])
+
+    # Three-way classification matching the paper's actual conclusions, not a
+    # flat p<0.05 cutoff: LOS is raw-p<0.05 but explicitly fails Holm-Bonferroni
+    # in Table 5b, so it cannot be colored the same as transfusion's confirmed finding.
+    def classify(label, p):
+        if label.startswith("Transfusion"):
+            return "confirmed" if p < 0.05 else "null"
+        if label.startswith("LOS"):
+            return "nominal" if p < 0.05 else "null"
+        return "null"  # EBL, Delta Hb, AKI: none survive as findings regardless of p
+
+    style = {
+        "confirmed": dict(color=SIG_COLOR, markersize=10, fill=True),
+        "nominal": dict(color=NOMINAL_COLOR, markersize=9, fill="half"),
+        "null": dict(color=NULL_COLOR, markersize=7, fill=False),
+    }
+
+    fig, ax = plt.subplots(figsize=(7.5, 4.2), dpi=150)
+    ys = np.arange(len(rows))[::-1]
+    for y, (label, n, b, lo, hi, p) in zip(ys, rows):
+        cls = classify(label, p)
+        s = style[cls]
+        c = s["color"]
+        ax.plot([lo, hi], [y, y], color=c, lw=2.2, solid_capstyle="round", zorder=2)
+        if s["fill"] == "half":
+            ax.plot(b, y, "o", color=c, markersize=s["markersize"],
+                    markerfacecolor="white", markeredgecolor=c, markeredgewidth=2.2,
+                    fillstyle="right", zorder=3)
+        else:
+            ax.plot(b, y, "o", color=c, markersize=s["markersize"],
+                    markerfacecolor=c if s["fill"] else "white", markeredgecolor=c,
+                    markeredgewidth=1.8, zorder=3)
+        note = {"confirmed": " * significant", "nominal": " * raw p, fails correction", "null": ""}[cls]
+        ax.text(hi + (0.02 * (max(r[4] for r in rows) - min(r[3] for r in rows))), y,
+                f"p={p:.3f}{note}", va="center", fontsize=8, color=c)
+
+    ax.axvline(0, color="#666666", lw=1.3, linestyle=(0, (4, 2)), zorder=0)
+    ax.set_yticks(ys)
+    ax.set_yticklabels([r[0] for r in rows], fontsize=9.5)
+    ax.set_xlabel("Burden coefficient per SD (each outcome's own modeled scale -- see row labels)", fontsize=9)
+    ax.set_title("Figure 4. Hypothermia burden across all five outcomes:\n"
+                 "one confirmed finding (transfusion); LOS does not survive correction; three nulls",
+                 fontsize=10.5, color=TEXT_COLOR)
+    ax.spines[["top", "right"]].set_visible(False)
+    ax.tick_params(colors=TEXT_COLOR)
+    ax.grid(axis="x", color="#e5e5e5", linewidth=0.8, zorder=0)
+    ax.set_axisbelow(True)
+
+    ax.plot([], [], "o", color=SIG_COLOR, markerfacecolor=SIG_COLOR, markersize=8, label="Confirmed (p<0.05)")
+    ax.plot([], [], "o", color=NOMINAL_COLOR, markerfacecolor="white", markeredgecolor=NOMINAL_COLOR,
+            markersize=7, markeredgewidth=2, label="Raw p<0.05, fails correction")
+    ax.plot([], [], "o", color=NULL_COLOR, markerfacecolor="white", markeredgecolor=NULL_COLOR,
+            markersize=7, markeredgewidth=1.8, label="Not significant")
+    ax.legend(loc="lower right", fontsize=7.5, frameon=False)
+
+    fig.tight_layout()
+    fig.savefig(FIGURES_DIR / "figure4_multi_outcome.png", facecolor="white", bbox_inches="tight")
+    plt.close(fig)
+
+    out = pd.DataFrame(rows, columns=["Outcome", "N", "Beta_per_SD", "CI_low", "CI_high", "p"])
+    out.to_csv(TABLES_DIR / "figure4_multi_outcome_values.csv", index=False)
+    print(f"Figure 4 (multi-outcome) saved -> {FIGURES_DIR / 'figure4_multi_outcome.png'}")
+    print(out.to_string(index=False))
 
 
 def assemble_manifest():
@@ -157,6 +295,7 @@ def assemble_manifest():
         ("Table 8b", "table8b_stomach_coverage_association.csv", "Stomach-surgery coverage-failure association, unadjusted and adjusted OR/CI/p"),
         ("Table 9", "table9_v1_replication_comparison.csv", "v1 (Delta Hb) vs. v2 (EBL) direct comparison, identical covariates/cohort/model type -- burden not significant for either outcome"),
         ("Figure 3 values", "figure3_rcs_values.csv", "RCS predicted-EBL values, peak-to-trough, CI band width, nonlinearity LRT p -- backs Figure 3's caption numbers"),
+        ("Figure 4 values", "figure4_multi_outcome_values.csv", "Per-SD burden coefficient, CI, p for all 5 outcomes -- backs Figure 4's multi-outcome summary plot"),
     ]
     rows = []
     for label, fname, desc in manifest:
@@ -182,6 +321,9 @@ def main():
     print("Figure 3 (RCS dose-response) already exists from 04b_followups.py:")
     fig3 = FIGURES_DIR / "figure3_rcs_dose_response.png"
     print(f"  {'OK' if fig3.exists() else 'MISSING'} -> {fig3}")
+    print()
+
+    figure4_multi_outcome(df)
     print()
 
     print("=" * 70)

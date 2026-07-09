@@ -242,7 +242,7 @@ Fit the exact final Aim 1 EBL model specification (§6b — burden + min_temp + 
 - **Figure 1** — STROBE flow diagram
 - **Figure 2** — Coefficient plot, Aim 1 primary model
 - **Figure 3** — Restricted cubic spline, burden vs. blood loss
-- **Figure 4** (if Aim 4 pursued) — Interaction plot, hypothermia × hypotension burden on AKI probability — DEFERRED, not part of this manuscript
+- **Figure 4 (repurposed)** — the Aim 4 interaction plot originally planned for this slot is deferred along with Aim 4 itself (not part of this manuscript). In its place: a multi-outcome summary forest plot, burden's per-SD coefficient across all five tested outcomes (transfusion, EBL, ΔHb, AKI, LOS) on their own modeled scales, three-way classified as confirmed / nominally-significant-but-fails-correction / null — added after Task #6 because the paper's actual shape (one real finding against four-plus-one nulls) wasn't known until the results existed. Script: `07_tables_figures.py::figure4_multi_outcome`.
 
 ---
 

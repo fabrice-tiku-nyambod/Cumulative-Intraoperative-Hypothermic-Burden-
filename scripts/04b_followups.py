@@ -35,6 +35,8 @@ COV_STR_LOGIT = COV_STR.replace("C(optype)", "C(optype_collapsed)")
 LINE_COLOR = "#1f5fa8"
 BAND_COLOR = "#a9c6e8"
 TEXT_COLOR = "#2a2a2a"
+CI_EDGE_COLOR = "#e8a33d"  # warm accent, separates "uncertainty" (CI) from "estimate" (line)
+RUG_COLOR = "#888888"
 
 
 def rcs_basis(x, knots):
@@ -150,7 +152,24 @@ def followup_2_rcs_plot(df):
 
     fig, ax = plt.subplots(figsize=(7, 5), dpi=150)
     ax.fill_between(grid, ebl_lo, ebl_hi, color=BAND_COLOR, alpha=0.6, linewidth=0, label="95% CI")
-    ax.plot(grid, ebl_mean, color=LINE_COLOR, linewidth=2.5)
+    # Warm-accent CI edges, distinct from the blue estimate line, so "uncertainty
+    # boundary" and "point estimate" read as two different things at a glance.
+    ax.plot(grid, ebl_lo, color=CI_EDGE_COLOR, linewidth=0.9, alpha=0.8, zorder=2)
+    ax.plot(grid, ebl_hi, color=CI_EDGE_COLOR, linewidth=0.9, alpha=0.8, zorder=2)
+    ax.plot(grid, ebl_mean, color=LINE_COLOR, linewidth=2.5, zorder=3)
+
+    # Rug plot: where the actual burden observations sit, so a reader can tell
+    # whether the curve's wiggle near the tails is real signal or just sparse
+    # data out there -- a legitimate reviewer question this dataset can answer
+    # for free, without needing the raw data themselves.
+    y_min, y_max = ax.get_ylim()
+    rug_y0 = y_min - 0.03 * (y_max - y_min)
+    rug_y1 = y_min
+    x_obs = df["hypothermia_burden"].values
+    x_obs_in_range = x_obs[(x_obs >= grid[0]) & (x_obs <= grid[-1])]
+    ax.vlines(x_obs_in_range, rug_y0, rug_y1, color=RUG_COLOR, linewidth=0.4, alpha=0.35, zorder=1, clip_on=False)
+    ax.set_ylim(rug_y0, y_max)
+
     ax.set_xlabel("Hypothermia burden (degree-minutes <36.0°C)", color=TEXT_COLOR)
     ax.set_ylabel("Predicted intraoperative EBL, mL\n(covariates at reference values)", color=TEXT_COLOR)
     ax.set_title(f"Restricted cubic spline: hypothermia burden vs. blood loss\n(nonlinearity LRT p={p_nonlin:.3f})",

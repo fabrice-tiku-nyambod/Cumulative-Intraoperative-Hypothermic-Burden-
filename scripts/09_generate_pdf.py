@@ -180,6 +180,11 @@ def insert_anchored_content(story):
         ("nearly half the variance in directly measured blood loss accounts for almost none",
          lambda: [Paragraph("<b>Table 9.</b> Delta Hb vs. EBL, identical covariates/cohort/model type.", styles["Caption"]),
                   load_csv_as_table(TABLES_DIR / "table9_v1_replication_comparison.csv"), Spacer(1, 10)]),
+        ("visible at a glance rather than requiring it to be reconstructed",
+         lambda: figure_flowable("figure4_multi_outcome.png",
+             "<b>Figure 4.</b> Hypothermia burden across all five tested outcomes: one confirmed "
+             "finding (transfusion), one that fails multiplicity correction (LOS), three nulls "
+             "(EBL, Delta Hb, AKI).")),
     ]
 
     new_story = []
