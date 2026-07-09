@@ -63,6 +63,22 @@ def stomach_association(ok):
     print("-> survives adjustment; not explained by duration, approach, or position alone.")
     print()
 
+    out = pd.DataFrame([{
+        "unadjusted_OR_fail_given_stomach": OR,
+        "unadjusted_CI_low": ci[0],
+        "unadjusted_CI_high": ci[1],
+        "fisher_exact_p": p_fisher,
+        "chi2_p": p_chi2,
+        "adjusted_OR_pass_given_stomach": or_adj,
+        "adjusted_CI_low": ci_adj[0],
+        "adjusted_CI_high": ci_adj[1],
+        "adjusted_p": m_adj.pvalues["is_stomach_i"],
+        "adjustment_covariates": "opdur_min + approach + position",
+    }])
+    out.to_csv(TABLES_DIR / "table8b_stomach_coverage_association.csv", index=False)
+    print(f"Saved -> {TABLES_DIR / 'table8b_stomach_coverage_association.csv'}")
+    print()
+
 
 def differential_attrition_check(m):
     print("=== Differential attrition check: does exclusion track outcome severity? ===")

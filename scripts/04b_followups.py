@@ -18,6 +18,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import statsmodels.formula.api as smf
+from scipy import stats
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_DIR = SCRIPT_DIR.parent
@@ -114,7 +115,12 @@ def followup_2_rcs_plot(df):
     df2["_rcs1"], df2["_rcs2"] = basis[:, 1], basis[:, 2]
 
     f_rcs = f"log_ebl ~ hypothermia_burden + _rcs1 + _rcs2 + min_core_temp + {COV_STR}"
+    f_lin = f"log_ebl ~ hypothermia_burden + min_core_temp + {COV_STR}"
     m_rcs = smf.ols(f_rcs, data=df2).fit()
+    m_lin = smf.ols(f_lin, data=df2).fit()
+    lr_stat = 2 * (m_rcs.llf - m_lin.llf)
+    df_diff = m_rcs.df_model - m_lin.df_model
+    p_nonlin = stats.chi2.sf(lr_stat, df_diff)
 
     # Predict across the observed range (5th-95th pctile, not extrapolated beyond data),
     # holding covariates at reference values (means for continuous, mode for categorical).
@@ -147,7 +153,7 @@ def followup_2_rcs_plot(df):
     ax.plot(grid, ebl_mean, color=LINE_COLOR, linewidth=2.5)
     ax.set_xlabel("Hypothermia burden (degree-minutes <36.0°C)", color=TEXT_COLOR)
     ax.set_ylabel("Predicted intraoperative EBL, mL\n(covariates at reference values)", color=TEXT_COLOR)
-    ax.set_title("Restricted cubic spline: hypothermia burden vs. blood loss\n(nonlinearity LRT p=0.011)",
+    ax.set_title(f"Restricted cubic spline: hypothermia burden vs. blood loss\n(nonlinearity LRT p={p_nonlin:.3f})",
                  color=TEXT_COLOR, fontsize=11)
     ax.spines[["top", "right"]].set_visible(False)
     ax.spines[["left", "bottom"]].set_color("#888888")
@@ -168,7 +174,20 @@ def followup_2_rcs_plot(df):
     print(f"Predicted EBL at burden={grid[-1]:.0f} (95th pctile): {ebl_mean.iloc[-1]:.0f} mL")
     print(f"Approx slope, low end of range: {slope_early:.2f} mL per unit burden")
     print(f"Approx slope, high end of range: {slope_late:.2f} mL per unit burden")
+    print(f"Nonlinearity LRT p-value (RCS vs linear): {p_nonlin:.4f}")
     print(f"Saved -> {FIGURES_DIR / 'figure3_rcs_dose_response.png'}")
+
+    rcs_tbl = pd.DataFrame([{
+        "burden_5th_pctile": grid[0], "ebl_pred_5th_mL": ebl_mean.iloc[0],
+        "burden_median_ish": grid[100], "ebl_pred_median_mL": ebl_mean.iloc[100],
+        "burden_95th_pctile": grid[-1], "ebl_pred_95th_mL": ebl_mean.iloc[-1],
+        "peak_to_trough_mL": ebl_mean.max() - ebl_mean.min(),
+        "ci_band_width_min_mL": (ebl_hi - ebl_lo).min(), "ci_band_width_max_mL": (ebl_hi - ebl_lo).max(),
+        "nonlinearity_LRT_p": p_nonlin,
+        "reference_profile_optype": ref["optype"],
+    }])
+    rcs_tbl.to_csv(TABLES_DIR / "figure3_rcs_values.csv", index=False)
+    print(f"Saved -> {TABLES_DIR / 'figure3_rcs_values.csv'}")
     print()
 
 
