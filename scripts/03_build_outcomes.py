@@ -138,7 +138,10 @@ def main():
         stage_kdigo(pc, p48, p7d)
         for pc, p48, p7d in zip(cohort["preop_cr"], cohort["peak_cr_48h"], cohort["peak_cr_7d"])
     ]
-    cohort["aki_any"] = cohort["aki_stage"] >= 1
+    # NaN >= 1 silently evaluates to False in pandas, not NaN -- .where() keeps
+    # missing-staging cases correctly missing rather than miscoded as "no AKI".
+    # Cast to float (not left as object/bool+None) for clean downstream regression use.
+    cohort["aki_any"] = (cohort["aki_stage"] >= 1).where(cohort["aki_stage"].notna()).astype(float)
 
     # --- Aim 3: LOS and mortality, direct from clinical_data.csv ---
     cohort["los_postop_days"] = (cohort["dis"] - cohort["opend"]) / DAY

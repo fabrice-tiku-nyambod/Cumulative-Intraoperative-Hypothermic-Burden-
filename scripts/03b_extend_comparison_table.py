@@ -79,7 +79,9 @@ def main():
         stage_kdigo(pc, p48, p7d)
         for pc, p48, p7d in zip(cohort["preop_cr"], cohort["peak_cr_48h"], cohort["peak_cr_7d"])
     ]
-    cohort["aki_any"] = cohort["aki_stage"] >= 1
+    # NaN >= 1 silently evaluates to False in pandas, not NaN -- .where() keeps
+    # missing-staging cases correctly missing rather than miscoded as "no AKI".
+    cohort["aki_any"] = (cohort["aki_stage"] >= 1).where(cohort["aki_stage"].notna()).astype(float)
 
     for name in ["ptinr", "aptt", "fib"]:
         preop = get_lab_value(cohort, lab, name, "opend", -PREOP_LOOKBACK_SEC, 0, agg="last")
@@ -101,11 +103,16 @@ def main():
                      f"{exc.mean():.2f} +/- {exc.std():.2f} (n={len(exc)})", f"{p:.4f}"])
 
     def add_cat(label, col, val):
-        inc_mask = cohort.loc[cohort["included"], col] == val
-        exc_mask = cohort.loc[~cohort["included"], col] == val
-        inc_n = cohort.loc[cohort["included"], col].notna().sum()
-        exc_n = cohort.loc[~cohort["included"], col].notna().sum()
-        tab = pd.crosstab(cohort["included"], cohort[col] == val)
+        # col == val on a NaN row silently evaluates to False, not NaN/excluded --
+        # restrict to non-missing rows FIRST so both the percentage and the
+        # chi2 test itself aren't contaminated by missing values miscoded as
+        # the negative category (this bit aki_any: 449 unstaged cases were
+        # silently counted as "no AKI" until this fix).
+        present = cohort[cohort[col].notna()]
+        inc_mask = present.loc[present["included"], col] == val
+        exc_mask = present.loc[~present["included"], col] == val
+        inc_n, exc_n = len(inc_mask), len(exc_mask)
+        tab = pd.crosstab(present["included"], present[col] == val)
         _, p, _, _ = stats.chi2_contingency(tab)
         rows.append([label, f"{inc_mask.mean():.1%} (n={inc_n})", f"{exc_mask.mean():.1%} (n={exc_n})", f"{p:.4f}"])
 
@@ -115,7 +122,9 @@ def main():
     add_cont("Delta fibrinogen, mg/dL", "delta_fib")
 
     ext = pd.DataFrame(rows, columns=tbl.columns)
-    full = pd.concat([tbl, ext], ignore_index=True)
+    # drop_duplicates(keep="last") makes this idempotent on rerun -- otherwise
+    # each run appends another copy of the AKI/coag rows onto its own prior output.
+    full = pd.concat([tbl, ext], ignore_index=True).drop_duplicates(subset="Characteristic", keep="last")
     print(full.to_string(index=False))
     full.to_csv(TABLES_DIR / "excluded_vs_included_comparison.csv", index=False)
     print(f"\nUpdated -> {TABLES_DIR / 'excluded_vs_included_comparison.csv'}")
