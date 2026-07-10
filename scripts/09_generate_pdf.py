@@ -260,7 +260,7 @@ def main():
         str(OUT_PATH), pagesize=letter,
         leftMargin=0.9 * inch, rightMargin=0.9 * inch,
         topMargin=0.9 * inch, bottomMargin=0.9 * inch,
-        title="Cumulative Intraoperative Hypothermic Burden Predicts Transfusion Practice but Not Measured Blood Loss",
+        title="Cumulative Intraoperative Hypothermic Burden Is Associated with Transfusion Practice but Not Measured Blood Loss",
         author="VitalDB Hypothermia Secondary Analysis",
     )
     doc.build(story)

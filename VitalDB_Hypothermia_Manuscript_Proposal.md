@@ -1,4 +1,4 @@
-# Manuscript Proposal: Cumulative Intraoperative Hypothermic Burden Predicts Transfusion Practice but Not Measured Blood Loss — A Decision-Outcome / Physiologic-Outcome Divergence
+# Manuscript Proposal: Cumulative Intraoperative Hypothermic Burden Is Associated with Transfusion Practice but Not Measured Blood Loss — A Divergence Between Decision and Physiologic Outcomes
 
 **A secondary analysis of the VitalDB open-access perioperative database**
 Draft protocol — v4 (reframed after §6d result — supersedes v3's "surrogate-sensitivity" framing, which the data did not confirm; see rationale below)
