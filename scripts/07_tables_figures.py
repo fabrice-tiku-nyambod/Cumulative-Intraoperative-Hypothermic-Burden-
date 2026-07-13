@@ -42,56 +42,88 @@ EXPLORATORY_COLOR = "#6a4c93"    # distinct from SIG/NOMINAL/NULL -- exploratory
                                   # imply the same "tested and failed" story
 
 
-def figure1_strobe(df_attrition):
-    fig, ax = plt.subplots(figsize=(8.5, 11), dpi=600)
-    ax.set_xlim(0, 10)
-    ax.set_ylim(0, 22)
-    ax.axis("off")
+def _rounded_box(ax, xy, w, h, fc, ec, lw, zorder=2, pad=0.02):
+    from matplotlib.patches import FancyBboxPatch
+    box = FancyBboxPatch(xy, w, h, boxstyle=f"round,pad={pad},rounding_size=0.09",
+                          facecolor=fc, edgecolor=ec, linewidth=lw, zorder=zorder,
+                          mutation_aspect=1)
+    ax.add_patch(box)
+    return box
 
-    # excl_kind: "data" (coverage/data-quality) vs "construct" (construct-validity,
-    # categorically different reason -- ASA=6 isn't a data problem, it's a population-
-    # definition problem) -- colored distinctly so a reader isn't reading every
-    # exclusion arrow as "the same kind of reason."
+
+def figure1_strobe(df_attrition):
+    # Department is dropped as its own filtering step -- it excludes zero cases
+    # (VitalDB's noncardiac cohort already sits entirely within these 4
+    # departments), so it's stated as a cohort-definition fact folded into the
+    # first box rather than a pointless "0 excluded" arrow with nothing on it.
     steps = [
-        ("Total cases in clinical_data.csv\n(VitalDB v1.0.0)", 6388, None, None),
-        ("Department in {General, Thoracic,\nUrology, Gynecology} surgery", 6388, "0 excluded (all cases already\nin these 4 departments)", "data"),
-        ("Age >= 18 years", 6323, "65 excluded\n(8 unparseable/missing age)", "data"),
-        ("Operative duration\n(opend-opstart) > 120 min", 2865, "3,458 excluded", "data"),
+        ("Noncardiac surgical cases\n(General/Thoracic/Urology/Gynecology)\nVitalDB v1.0.0", 6388, None, None),
+        ("Age ≥ 18 years", 6323, "65 excluded\n(8 unparseable/missing age)", "data"),
+        ("Operative duration\n(opend−opstart) > 120 min", 2865, "3,458 excluded", "data"),
         ("Reoperation dedup\n(index case per subjectid)", 2824, "41 excluded\n(39 subjects had >1 case)", "data"),
         ("CANDIDATE COHORT", 2824, None, None),
-        ("BT trimmed coverage >= 95%\n(per-case observed-window rule)", 2568, "256 excluded:\n75 no_valid_bt, 1 empty-window,\n180 failed coverage threshold", "data"),
+        ("BT trimmed coverage ≥ 95%\n(per-case observed-window rule)", 2568,
+         "256 excluded:\n75 no_valid_bt\n1 empty-window\n180 failed coverage", "data"),
         ("ANALYTIC COHORT", 2568, None, None),
-        ("Exclude ASA=6\n(brain-dead organ donor)", 2567, "1 excluded (physiologically\nnon-comparable to surgical cohort)", "construct"),
+        ("Exclude ASA=6\n(brain-dead organ donor)", 2567,
+         "1 excluded\n(physiologically non-comparable\nto surgical cohort)", "construct"),
         ("FINAL AIM 1-3 COHORT", 2567, None, None),
     ]
 
-    y = 21
-    box_h = 1.15
+    box_w, box_h, gap = 5.6, 1.05, 0.55
+    excl_w = 3.3
+    box_x0 = 0.3
+    excl_x0 = box_x0 + box_w + 0.75
+    canvas_w = excl_x0 + excl_w + 0.3   # right margin so exclusion boxes are never clipped
+    n_steps = len(steps)
+    canvas_h = n_steps * box_h + (n_steps - 1) * gap + 1.3
+    fig, ax = plt.subplots(figsize=(canvas_w, canvas_h * 0.82), dpi=600)
+    ax.set_xlim(0, canvas_w)
+    ax.set_ylim(0, canvas_h)
+    ax.axis("off")
+    y = canvas_h - 0.9
     for i, (label, n, excl_note, excl_kind) in enumerate(steps):
-        is_milestone = label.isupper() or label in ("CANDIDATE COHORT", "ANALYTIC COHORT", "FINAL AIM 1-3 COHORT")
+        is_milestone = label.isupper()
         fc = MILESTONE_FILL if is_milestone else "white"
-        lw = 2.0 if is_milestone else 1.2
-        box = plt.Rectangle((1.5, y - box_h), 6, box_h, facecolor=fc, edgecolor=BOX_EDGE, linewidth=lw, zorder=2)
-        ax.add_patch(box)
-        ax.text(4.5, y - box_h / 2, f"{label}\nN = {n:,}", ha="center", va="center",
-                 fontsize=9.5 if is_milestone else 8.5,
-                 fontweight="bold" if is_milestone else "normal", color=TEXT_COLOR, zorder=3)
+        ec = BOX_EDGE if not is_milestone else "#3a5a80"
+        lw = 2.2 if is_milestone else 1.1
+        _rounded_box(ax, (box_x0, y - box_h), box_w, box_h, fc, ec, lw, zorder=2)
+
+        cy = y - box_h / 2
+        if is_milestone:
+            ax.text(box_x0 + box_w / 2, cy + 0.16, label, ha="center", va="center",
+                     fontsize=11, fontweight="bold", color="#1a3a5c", zorder=3)
+            ax.text(box_x0 + box_w / 2, cy - 0.24, f"N = {n:,}", ha="center", va="center",
+                     fontsize=13, fontweight="bold", color="#1a3a5c", zorder=3)
+        else:
+            ax.text(box_x0 + box_w / 2, cy + 0.15, label, ha="center", va="center",
+                     fontsize=9, color=TEXT_COLOR, zorder=3, linespacing=1.4)
+            ax.text(box_x0 + box_w / 2, cy - 0.32, f"N = {n:,}", ha="center", va="center",
+                     fontsize=10.5, fontweight="bold", color=TEXT_COLOR, zorder=3)
 
         if excl_note:
             excl_color = CONSTRUCT_COLOR if excl_kind == "construct" else DATAQUAL_COLOR
-            ax.annotate("", xy=(7.6, y - box_h / 2), xytext=(9.3, y - box_h / 2),
-                         arrowprops=dict(arrowstyle="-", color=excl_color, lw=1.2), zorder=1)
-            ax.text(9.35, y - box_h / 2, excl_note, ha="left", va="center", fontsize=7.3, color=excl_color)
+            excl_fill = "#f5eefa" if excl_kind == "construct" else "#eef2f6"
+            n_lines = excl_note.count("\n") + 1
+            eh = 0.34 + 0.28 * n_lines
+            ex0 = box_x0 + box_w + 0.75
+            ey_top = cy + eh / 2
+            # real arrow from the box edge to the exclusion callout, not a bare line
+            ax.annotate("", xy=(ex0 - 0.04, cy), xytext=(box_x0 + box_w + 0.06, cy),
+                         arrowprops=dict(arrowstyle="-|>", color=excl_color, lw=1.3, mutation_scale=12), zorder=1)
+            _rounded_box(ax, (ex0, cy - eh / 2), excl_w, eh, excl_fill, excl_color, 1.1, zorder=2, pad=0.015)
+            ax.text(ex0 + excl_w / 2, cy, excl_note, ha="center", va="center",
+                     fontsize=7.6, color=excl_color, zorder=3, linespacing=1.5)
 
-        if i < len(steps) - 1:
-            ax.annotate("", xy=(4.5, y - box_h - 0.55), xytext=(4.5, y - box_h),
-                         arrowprops=dict(arrowstyle="-|>", color=BOX_EDGE, lw=1.4), zorder=1)
-        y -= box_h + 0.75
+        if i < n_steps - 1:
+            ax.annotate("", xy=(box_x0 + box_w / 2, y - box_h - gap + 0.08),
+                         xytext=(box_x0 + box_w / 2, y - box_h - 0.03),
+                         arrowprops=dict(arrowstyle="-|>", color=BOX_EDGE, lw=1.5, mutation_scale=14), zorder=1)
+        y -= box_h + gap
 
-    # Legend distinguishing the two exclusion categories.
-    ax.plot([], [], color=DATAQUAL_COLOR, lw=1.5, label="Coverage / data-quality exclusion")
-    ax.plot([], [], color=CONSTRUCT_COLOR, lw=1.5, label="Construct-validity exclusion")
-    ax.legend(loc="lower center", bbox_to_anchor=(0.5, -0.02), fontsize=8, frameon=False, ncol=2)
+    ax.plot([], [], color=DATAQUAL_COLOR, lw=2, label="Coverage / data-quality exclusion")
+    ax.plot([], [], color=CONSTRUCT_COLOR, lw=2, label="Construct-validity exclusion")
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, 0.02), fontsize=8.5, frameon=False, ncol=2)
 
     ax.set_title("Figure 1. STROBE cohort flow diagram", fontsize=12, color=TEXT_COLOR, pad=10)
     fig.tight_layout()
