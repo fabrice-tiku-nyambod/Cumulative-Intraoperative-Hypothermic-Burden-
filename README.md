@@ -104,17 +104,3 @@ project/
   references_formatted.md                       # reference list (Annals of Surgery style)
   requirements.txt
 ```
-
-## A note on how this was built
-
-This analysis was developed interactively with heavy use of an AI coding
-assistant (Claude), with the human author directing methodology decisions,
-reviewing every statistical/coding choice, and catching several errors the
-assistant introduced along the way (a KDIGO staging bug misclassifying
-chronic dialysis patients as acute kidney injury, an `NaN`-as-`False`
-pandas trap that silently miscoded missing AKI staging as confirmed
-"no AKI" in two separate places, a table-rendering bug that was dropping
-columns and losing numeric precision, and others) — all documented in the
-git history and `RESULTS_PROVENANCE.md` rather than smoothed over. Anyone
-reviewing this analysis should read the commit history, not just the final
-diff, if they want to understand what was checked and why.
