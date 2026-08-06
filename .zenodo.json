@@ -1,0 +1,9 @@
+{
+  "title": "Cumulative Intraoperative Hypothermic Burden Analysis Pipeline",
+  "creators": [
+    {
+      "name": "Anonymous"
+    }
+  ],
+  "description": "Code and analytical pipeline for secondary analysis of VitalDB v1.0.0 testing cumulative intraoperative hypothermic burden."
+}
