@@ -2,9 +2,7 @@
 
 Secondary analysis of VitalDB v1.0.0 (PhysioNet) testing whether cumulative
 intraoperative hypothermic burden predicts blood loss, transfusion, and
-downstream outcomes. See `VitalDB_Hypothermia_Manuscript_Proposal.md` for
-the full locked protocol and `VitalDB_Hypothermia_Manuscript.pdf` for the
-manuscript.
+downstream outcomes. 
 
 ## Reproducing this analysis
 
@@ -98,8 +96,7 @@ project/
     tables/             # gitignored, regenerated
     figures/            # gitignored, regenerated
   VitalDB_Hypothermia_Manuscript_Proposal.md   # locked protocol, source of truth
-  VitalDB_Hypothermia_Manuscript.pdf            # rendered manuscript
-  manuscript_draft.md                           # manuscript source (markdown)
+
   RESULTS_PROVENANCE.md                         # number -> script -> commit trail
   references_formatted.md                       # reference list (Annals of Surgery style)
   requirements.txt
